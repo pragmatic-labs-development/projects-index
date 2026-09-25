@@ -26,14 +26,25 @@ jobs:
         with:
           node-version: 22
 
+      # Regenerate ONLY with a token that can see private repos.
+      #
+      # The default GITHUB_TOKEN is scoped to this repository, so building with
+      # it silently drops every private repo — the index went from 17 entries to
+      # 9 the first time this ran. Without a PAT we deploy the committed
+      # index.html as-is, which is stale but never wrong by omission.
+      #
+      # To enable weekly refresh: create a fine-grained PAT with read access to
+      # the org's repos and add it as the INDEX_TOKEN secret.
       - name: Rebuild from the GitHub API
+        if: ${{ secrets.INDEX_TOKEN != '' }}
         run: node build.mjs
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.INDEX_TOKEN }}
 
       # Only commits when something actually changed, so scheduled runs don't
       # create empty commits every week.
       - name: Commit if changed
+        if: ${{ secrets.INDEX_TOKEN != '' }}
         run: |
           if ! git diff --quiet index.html; then
             git config user.name "github-actions[bot]"
