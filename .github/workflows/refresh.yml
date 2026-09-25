@@ -20,6 +20,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # The `secrets` context can't be used in a step-level `if` — doing so makes
+    # the whole workflow fail to parse. Lift it into env and test that instead.
+    env:
+      INDEX_TOKEN: ${{ secrets.INDEX_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,7 +40,7 @@ jobs:
       # To enable weekly refresh: create a fine-grained PAT with read access to
       # the org's repos and add it as the INDEX_TOKEN secret.
       - name: Rebuild from the GitHub API
-        if: ${{ secrets.INDEX_TOKEN != '' }}
+        if: env.INDEX_TOKEN != ''
         run: node build.mjs
         env:
           GH_TOKEN: ${{ secrets.INDEX_TOKEN }}
@@ -44,7 +48,7 @@ jobs:
       # Only commits when something actually changed, so scheduled runs don't
       # create empty commits every week.
       - name: Commit if changed
-        if: ${{ secrets.INDEX_TOKEN != '' }}
+        if: env.INDEX_TOKEN != ''
         run: |
           if ! git diff --quiet index.html; then
             git config user.name "github-actions[bot]"
