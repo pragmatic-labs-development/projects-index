@@ -13,7 +13,16 @@
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
-const OWNER = 'pragmatic-labs-development';
+/**
+ * Both accounts.
+ *
+ * Projects are split across an org and a personal account with near-identical
+ * names — `pragmatic-labs-development` vs `pragmaticlabsdevelopment`. Scanning
+ * only the org silently hid the design-library prototype library and
+ * pickup-soccer-bot, which is exactly the kind of omission this page exists to
+ * prevent.
+ */
+const OWNERS = ['pragmatic-labs-development', 'pragmaticlabsdevelopment'];
 
 /** Custom domains, which GitHub's API doesn't expose on the repo record. */
 const CUSTOM_DOMAINS = {
@@ -39,15 +48,18 @@ const NOTES = {
   'nudgy-website': 'Marketing site for the screenshot tool. Frozen, still serving.',
   envisor: 'Monorepo: Launchpad app plus ten marketing-site concepts.',
   'envisor-demo': 'Public mirror of the Envisor prototypes.',
+  'design-library': 'The prototype library — click through projects and design versions.',
 };
 
 const sh = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 20e6 });
 
-const repos = JSON.parse(
-  sh('gh', [
-    'repo', 'list', OWNER, '--limit', '100', '--json',
-    'name,description,visibility,isArchived,pushedAt,createdAt,primaryLanguage,homepageUrl,url',
-  ]),
+const repos = OWNERS.flatMap((owner) =>
+  JSON.parse(
+    sh('gh', [
+      'repo', 'list', owner, '--limit', '100', '--json',
+      'name,description,visibility,isArchived,pushedAt,createdAt,primaryLanguage,homepageUrl,url',
+    ]),
+  ).map((r) => ({ ...r, owner })),
 );
 
 /** Is something actually being served here? */
@@ -66,13 +78,13 @@ for (const r of repos) {
   const candidates = [
     CUSTOM_DOMAINS[r.name],
     r.homepageUrl,
-    `https://${OWNER}.github.io/${r.name}/`,
+    `https://${r.owner}.github.io/${r.name}/`,
   ].filter(Boolean);
 
   r.live = candidates.find(isLive) ?? null;
   r.note = NOTES[r.name] ?? r.description ?? '';
   r.nested = (NESTED[r.name] ?? [])
-    .map(([path, label]) => ({ label, url: `https://${OWNER}.github.io/${r.name}/${path}` }))
+    .map(([path, label]) => ({ label, url: `https://${r.owner}.github.io/${r.name}/${path}` }))
     .filter((n) => isLive(n.url));
 
   if (r.live) console.log(`  live: ${r.name} → ${r.live}`);
@@ -104,6 +116,7 @@ const card = (r) => `
             ${r.visibility === 'PRIVATE' ? '<span class="tag">private</span>' : ''}
             ${r.isArchived ? '<span class="tag">archived</span>' : ''}
             ${r.primaryLanguage ? `<span class="lang">${esc(r.primaryLanguage.name)}</span>` : ''}
+            ${r.owner === 'pragmaticlabsdevelopment' ? '<span class="tag">personal</span>' : ''}
             <span class="when">${when(r.pushedAt)}</span>
           </span>
         </div>
